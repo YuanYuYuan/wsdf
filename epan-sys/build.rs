@@ -1,53 +1,52 @@
 #[cfg(feature = "bindgen")]
 extern crate bindgen;
 
+use anyhow::Result;
+use flate2::read::GzDecoder;
 use std::env;
 use std::path::PathBuf;
-use std::process::Command;
+use tar::Archive;
 
-fn main() {
+const WIRESHARK_VERSION: &str = "v4.1.1rc0";
+const WIRESHARK_SOURCE_DIR: &str = "wireshark";
+
+fn main() -> Result<()> {
     // If we are in docs.rs, there is no need to actually link.
     if std::env::var("DOCS_RS").is_ok() {
-        return;
+        return Ok(());
     }
 
     // By default, we will just use a pre-generated bindings.rs file. If this feature is turned
     // on, we'll re-generate the bindings at build time.
     #[cfg(feature = "bindgen")]
-    generate_bindings();
+    generate_bindings()?;
 
-    link_wireshark();
+    link_wireshark()?;
+    Ok(())
 }
 
-fn link_wireshark() {
-    if pkg_config::probe_library("wireshark").is_ok() {
-        // pkg-config will handle everything for us
-        return;
-    }
+fn link_wireshark() -> Result<()> {
+    // if pkg_config::probe_library("wireshark").is_ok() {
+    //     // pkg-config will handle everything for us
+    //
+    //     return;
+    // }
 
     println!("cargo:rustc-link-lib=dylib=wireshark");
 
     if let Ok(libws_dir) = env::var("WIRESHARK_LIB_DIR") {
         println!("cargo:rustc-link-search=native={}", libws_dir);
     } else {
-        // We'll have to pull wireshark in and build it...
-        println!("cargo:warning=libwireshark was not found, will be built from source");
-
-        clone_wireshark_or_die();
-        let dst = build_wireshark();
-
-        let mut dylib_dir = dst;
-        dylib_dir.push("lib");
-
-        println!(
-            "cargo:rustc-link-search=native={}",
-            dylib_dir.to_string_lossy()
-        );
+        if !std::path::Path::new(WIRESHARK_SOURCE_DIR).exists() {
+            download_and_build_wireshark()?;
+        }
     }
+
+    Ok(())
 }
 
 #[cfg(feature = "bindgen")]
-fn generate_bindings() {
+fn generate_bindings() -> Result<()> {
     let mut builder = bindgen::Builder::default()
         .header("wrapper.h")
         .generate_comments(false);
@@ -60,14 +59,13 @@ fn generate_bindings() {
         }
         Err(_) => {
             let glib = pkg_config::Config::new()
-                .probe("glib-2.0")
-                .expect("glib-2.0 must be installed");
+                .probe("glib-2.0")?;
 
             for path in glib.include_paths {
                 builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
             }
 
-            clone_wireshark_or_die();
+            download_wireshark()?;
             let dst = build_wireshark();
 
             let mut ws_headers_path = dst;
@@ -79,24 +77,48 @@ fn generate_bindings() {
     }
 
     let bindings = builder
-        .generate()
-        .expect("should be able to generate bindings from wrapper.h");
+        .generate()?;
 
     let out_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("generated bindings should be written to file");
+        .write_to_file(out_path.join("bindings.rs"))?;
+
+    Ok(())
 }
 
-fn clone_wireshark_or_die() {
-    Command::new("git")
-        .args(["submodule", "update", "--init", "--recursive", "wireshark"])
-        .output()
-        .expect("wireshark should be obtained as a git submodule");
+fn download_and_build_wireshark() -> Result<()> {
+    // We'll have to pull wireshark in and build it...
+    println!("cargo:warning=libwireshark was not found, will be built from source");
+
+    download_wireshark()?;
+    let dst = build_wireshark();
+
+    let mut dylib_dir = dst;
+    dylib_dir.push("lib");
+
+    println!(
+        "cargo:rustc-link-search=native={}",
+        dylib_dir.to_string_lossy()
+    );
+    Ok(())
+}
+
+fn download_wireshark() -> Result<()> {
+    let file_name = format!("wireshark-{WIRESHARK_VERSION}.tar.gz");
+    let url = format!(
+        "https://gitlab.com/wireshark/wireshark/-/archive/{WIRESHARK_VERSION}/{file_name}"
+    );
+    let response = reqwest::blocking::get(url)?;
+    let bytes = response.bytes()?.to_vec();
+    let readable = GzDecoder::new(bytes.as_slice());
+    let mut archive = Archive::new(readable);
+    archive.unpack(".")?;
+    std::fs::rename(format!("wireshark-{WIRESHARK_VERSION}"), WIRESHARK_SOURCE_DIR)?;
+    Ok(())
 }
 
 fn build_wireshark() -> PathBuf {
-    cmake::Config::new("wireshark")
+    cmake::Config::new(WIRESHARK_SOURCE_DIR)
         .define("BUILD_androiddump", "OFF")
         .define("BUILD_capinfos", "OFF")
         .define("BUILD_captype", "OFF")
