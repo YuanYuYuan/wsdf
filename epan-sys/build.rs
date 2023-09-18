@@ -111,6 +111,9 @@ fn download_wireshark() -> Result<()> {
     let readable = GzDecoder::new(bytes.as_slice());
     let mut archive = Archive::new(readable);
     archive.unpack(".")?;
+    if std::path::Path::new(WIRESHARK_SOURCE_DIR).exists() {
+        std::fs::remove_dir_all(WIRESHARK_SOURCE_DIR)?;
+    }
     std::fs::rename(format!("wireshark-{WIRESHARK_VERSION}"), WIRESHARK_SOURCE_DIR)?;
     Ok(())
 }
