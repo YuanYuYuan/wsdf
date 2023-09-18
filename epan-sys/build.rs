@@ -28,7 +28,7 @@ fn main() -> Result<()> {
 fn link_wireshark() -> Result<()> {
     if pkg_config::probe_library("wireshark").is_ok() {
         // pkg-config will handle everything for us
-        return;
+        return Ok(());
     }
 
     println!("cargo:rustc-link-lib=dylib=wireshark");
