@@ -37,9 +37,7 @@ fn link_wireshark() -> Result<()> {
     if let Ok(libws_dir) = env::var("WIRESHARK_LIB_DIR") {
         println!("cargo:rustc-link-search=native={}", libws_dir);
     } else {
-        if !std::path::Path::new(WIRESHARK_SOURCE_DIR).exists() {
-            download_and_build_wireshark()?;
-        }
+        download_and_build_wireshark()?;
     }
 
     Ok(())
