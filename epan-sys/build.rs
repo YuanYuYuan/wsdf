@@ -55,8 +55,7 @@ fn generate_bindings() -> Result<()> {
             }
         }
         Err(_) => {
-            let glib = pkg_config::Config::new()
-                .probe("glib-2.0")?;
+            let glib = pkg_config::Config::new().probe("glib-2.0")?;
 
             for path in glib.include_paths {
                 builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
@@ -73,12 +72,10 @@ fn generate_bindings() -> Result<()> {
         }
     }
 
-    let bindings = builder
-        .generate()?;
+    let bindings = builder.generate()?;
 
     let out_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    bindings
-        .write_to_file(out_path.join("bindings.rs"))?;
+    bindings.write_to_file(out_path.join("bindings.rs"))?;
 
     Ok(())
 }
@@ -89,6 +86,7 @@ fn download_and_build_wireshark() -> Result<()> {
 
     download_wireshark()?;
     let dst = build_wireshark();
+    println!("cargo:warning=dst dir is {}", &dst.display());
 
     let mut dylib_dir = dst;
     dylib_dir.push("lib");
@@ -102,9 +100,8 @@ fn download_and_build_wireshark() -> Result<()> {
 
 fn download_wireshark() -> Result<()> {
     let file_name = format!("wireshark-{WIRESHARK_VERSION}.tar.gz");
-    let url = format!(
-        "https://gitlab.com/wireshark/wireshark/-/archive/{WIRESHARK_VERSION}/{file_name}"
-    );
+    let url =
+        format!("https://gitlab.com/wireshark/wireshark/-/archive/{WIRESHARK_VERSION}/{file_name}");
     let response = reqwest::blocking::get(url)?;
     let bytes = response.bytes()?.to_vec();
     let readable = GzDecoder::new(bytes.as_slice());
@@ -113,7 +110,10 @@ fn download_wireshark() -> Result<()> {
     if std::path::Path::new(WIRESHARK_SOURCE_DIR).exists() {
         std::fs::remove_dir_all(WIRESHARK_SOURCE_DIR)?;
     }
-    std::fs::rename(format!("wireshark-{WIRESHARK_VERSION}"), WIRESHARK_SOURCE_DIR)?;
+    std::fs::rename(
+        format!("wireshark-{WIRESHARK_VERSION}"),
+        WIRESHARK_SOURCE_DIR,
+    )?;
     Ok(())
 }
 
@@ -143,5 +143,14 @@ fn build_wireshark() -> PathBuf {
         .define("BUILD_wifidump", "OFF")
         .define("BUILD_wireshark", "OFF")
         .define("BUILD_xxx2deb", "OFF")
+        .define("ENABLE_KERBEROS", "OFF")
+        .define("ENABLE_SBC", "OFF")
+        .define("ENABLE_SPANDSP", "OFF")
+        .define("ENABLE_BCG729", "OFF")
+        .define("ENABLE_AMRNB", "OFF")
+        .define("ENABLE_ILBC", "OFF")
+        .define("ENABLE_LIBXML2", "OFF")
+        .define("ENABLE_OPUS", "OFF")
+        .define("ENABLE_SINSP", "OFF")
         .build()
 }
