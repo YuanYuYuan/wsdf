@@ -3,7 +3,6 @@ extern crate bindgen;
 
 use anyhow::Result;
 use std::env;
-use std::path::PathBuf;
 
 fn main() -> Result<()> {
     // If we are in docs.rs, there is no need to actually link.
@@ -29,6 +28,10 @@ fn link_wireshark() -> Result<()> {
     // Default wireshark libraray installed on windows
     #[cfg(target_os = "windows")]
     println!( "cargo:rustc-link-search=native={}", "C:\\Program Files\\Wireshark");
+
+    // Default wireshark libraray installed on macos
+    #[cfg(target_os = "macos")]
+    println!( "cargo:rustc-link-search=native={}", "/Applications/Wireshark.app/Contents/Frameworks");
 
     // Specify the wireshark library directory by the environmental variable
     println!("cargo:rerun-if-env-changed=WIRESHARK_LIB_DIR");
@@ -73,6 +76,7 @@ fn generate_bindings() -> Result<()> {
 
     let bindings = builder.generate()?;
 
+    use std::path::PathBuf;
     let out_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
