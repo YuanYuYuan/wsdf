@@ -2,13 +2,8 @@
 extern crate bindgen;
 
 use anyhow::Result;
-use flate2::read::GzDecoder;
 use std::env;
 use std::path::PathBuf;
-use tar::Archive;
-
-const WIRESHARK_VERSION: &str = "v4.1.1rc0";
-const WIRESHARK_SOURCE_DIR: &str = "wireshark";
 
 fn main() -> Result<()> {
     // If we are in docs.rs, there is no need to actually link.
@@ -26,18 +21,22 @@ fn main() -> Result<()> {
 }
 
 fn link_wireshark() -> Result<()> {
+    // pkg-config will handle everything for us
     if pkg_config::probe_library("wireshark").is_ok() {
-        // pkg-config will handle everything for us
         return Ok(());
     }
 
-    println!("cargo:rustc-link-lib=dylib=wireshark");
+    // Default wireshark libraray installed on windows
+    #[cfg(target_os = "windows")]
+    println!( "cargo:rustc-link-search=native={}", "C:\\Program Files\\Wireshark");
 
+    // Specify the wireshark library directory by the environmental variable
+    println!("cargo:rerun-if-env-changed=WIRESHARK_LIB_DIR");
     if let Ok(libws_dir) = env::var("WIRESHARK_LIB_DIR") {
         println!("cargo:rustc-link-search=native={}", libws_dir);
-    } else {
-        download_and_build_wireshark()?;
     }
+
+    println!("cargo:rustc-link-lib=dylib=wireshark");
 
     Ok(())
 }
@@ -78,79 +77,4 @@ fn generate_bindings() -> Result<()> {
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
     Ok(())
-}
-
-fn download_and_build_wireshark() -> Result<()> {
-    // We'll have to pull wireshark in and build it...
-    println!("cargo:warning=libwireshark was not found, will be built from source");
-
-    download_wireshark()?;
-    let dst = build_wireshark();
-    println!("cargo:warning=dst dir is {}", &dst.display());
-
-    let mut dylib_dir = dst;
-    dylib_dir.push("lib");
-
-    println!(
-        "cargo:rustc-link-search=native={}",
-        dylib_dir.to_string_lossy()
-    );
-    Ok(())
-}
-
-fn download_wireshark() -> Result<()> {
-    let file_name = format!("wireshark-{WIRESHARK_VERSION}.tar.gz");
-    let url =
-        format!("https://gitlab.com/wireshark/wireshark/-/archive/{WIRESHARK_VERSION}/{file_name}");
-    let response = reqwest::blocking::get(url)?;
-    let bytes = response.bytes()?.to_vec();
-    let readable = GzDecoder::new(bytes.as_slice());
-    let mut archive = Archive::new(readable);
-    archive.unpack(".")?;
-    if std::path::Path::new(WIRESHARK_SOURCE_DIR).exists() {
-        std::fs::remove_dir_all(WIRESHARK_SOURCE_DIR)?;
-    }
-    std::fs::rename(
-        format!("wireshark-{WIRESHARK_VERSION}"),
-        WIRESHARK_SOURCE_DIR,
-    )?;
-    Ok(())
-}
-
-fn build_wireshark() -> PathBuf {
-    cmake::Config::new(WIRESHARK_SOURCE_DIR)
-        .define("BUILD_androiddump", "OFF")
-        .define("BUILD_capinfos", "OFF")
-        .define("BUILD_captype", "OFF")
-        .define("BUILD_ciscodump", "OFF")
-        .define("BUILD_corbaidl2wrs", "OFF")
-        .define("BUILD_dcerpcidl2wrs", "OFF")
-        .define("BUILD_dftest", "OFF")
-        .define("BUILD_dpauxmon", "OFF")
-        .define("BUILD_dumpcap", "OFF")
-        .define("BUILD_editcap", "OFF")
-        .define("BUILD_etwdump", "OFF")
-        .define("BUILD_logray", "OFF")
-        .define("BUILD_mergecap", "OFF")
-        .define("BUILD_randpkt", "OFF")
-        .define("BUILD_randpktdump", "OFF")
-        .define("BUILD_rawshark", "OFF")
-        .define("BUILD_reordercap", "OFF")
-        .define("BUILD_sshdump", "OFF")
-        .define("BUILD_text2pcap", "OFF")
-        .define("BUILD_tfshark", "OFF")
-        .define("BUILD_tshark", "OFF")
-        .define("BUILD_wifidump", "OFF")
-        .define("BUILD_wireshark", "OFF")
-        .define("BUILD_xxx2deb", "OFF")
-        .define("ENABLE_KERBEROS", "OFF")
-        .define("ENABLE_SBC", "OFF")
-        .define("ENABLE_SPANDSP", "OFF")
-        .define("ENABLE_BCG729", "OFF")
-        .define("ENABLE_AMRNB", "OFF")
-        .define("ENABLE_ILBC", "OFF")
-        .define("ENABLE_LIBXML2", "OFF")
-        .define("ENABLE_OPUS", "OFF")
-        .define("ENABLE_SINSP", "OFF")
-        .build()
 }
