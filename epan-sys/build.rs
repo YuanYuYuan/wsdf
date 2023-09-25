@@ -56,46 +56,29 @@ fn generate_bindings() -> Result<()> {
         .header("wrapper.h")
         .generate_comments(false);
 
-    // match pkg_config::probe_library("wireshark") {
-    //     Ok(libws) => {
-    //         for path in libws.include_paths {
-    //             builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
-    //         }
-    //     }
-    //     Err(_) => {
-    //         let glib = pkg_config::Config::new().probe("glib-2.0")?;
-    //
-    //         for path in glib.include_paths {
-    //             builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
-    //         }
-    //
-    //         download_wireshark()?;
-    //         let dst = build_wireshark();
-    //
-    //         let mut ws_headers_path = dst;
-    //         ws_headers_path.push("include");
-    //         ws_headers_path.push("wireshark");
-    //
-    //         builder = builder.clang_arg(format!("-I{}", ws_headers_path.to_string_lossy()));
-    //     }
-    // }
-    let glib = pkg_config::Config::new().probe("glib-2.0")?;
+    match pkg_config::probe_library("wireshark") {
+        Ok(libws) => {
+            for path in libws.include_paths {
+                builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
+            }
+        }
+        Err(_) => {
+            download_wireshark()?;
+            let dst = build_wireshark();
 
-    for path in glib.include_paths {
-        builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
+            let mut ws_headers_path = dst;
+            ws_headers_path.push("include");
+            ws_headers_path.push("wireshark");
+
+            let glib = pkg_config::Config::new().probe("glib-2.0")?;
+            for path in glib.include_paths {
+                builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
+            }
+            builder = builder.clang_arg(format!("-I{}", ws_headers_path.to_string_lossy()));
+        }
     }
 
-    download_wireshark()?;
-    let dst = build_wireshark();
-
-    let mut ws_headers_path = dst;
-    ws_headers_path.push("include");
-    ws_headers_path.push("wireshark");
-
-    builder = builder.clang_arg(format!("-I{}", ws_headers_path.to_string_lossy()));
-
     let bindings = builder.generate()?;
-
     let out_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
