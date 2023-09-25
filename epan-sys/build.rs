@@ -33,7 +33,14 @@ fn link_wireshark() -> Result<()> {
 
     // Default wireshark libraray installed on windows
     #[cfg(target_os = "windows")]
-    println!( "cargo:rustc-link-search=native={}", "C:\\Program Files\\Wireshark");
+    {
+        download_wireshark()?;
+        env::set_var("WIRESHARK_BASE_DIR", "C:\\Development");
+        env::set_var("PLATFORM", "win64");
+        let dst = build_wireshark();
+        println!( "cargo:rustc-link-search=native={}", "C:\\Program Files\\Wireshark");
+        println!( "cargo:rustc-link-search=native={}", dst.to_string_lossy());
+    }
 
     // Default wireshark libraray installed on macos
     #[cfg(target_os = "macos")]
@@ -64,6 +71,11 @@ fn generate_bindings() -> Result<()> {
         }
         Err(_) => {
             download_wireshark()?;
+
+            #[cfg(target_os = "windows")] {
+                env::set_var("WIRESHARK_BASE_DIR", "C:\\Development");
+                env::set_var("PLATFORM", "win64");
+            }
             let dst = build_wireshark();
 
             let mut ws_headers_path = dst;
