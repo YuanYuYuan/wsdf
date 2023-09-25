@@ -31,13 +31,12 @@ fn link_wireshark() -> Result<()> {
         return Ok(());
     }
 
-    // Default wireshark libraray installed on windows
     #[cfg(target_os = "windows")]
     {
+        // Download and build wireshark.lib
         download_wireshark()?;
-        env::set_var("WIRESHARK_BASE_DIR", "C:\\Development");
-        env::set_var("PLATFORM", "win64");
         let dst = build_wireshark();
+        // Default wireshark libraray installed on windows
         println!( "cargo:rustc-link-search=native={}", "C:\\Program Files\\Wireshark");
         println!( "cargo:rustc-link-search=native={}", dst.to_string_lossy());
     }
@@ -99,7 +98,6 @@ fn generate_bindings() -> Result<()> {
 
 
 fn download_wireshark() -> Result<()> {
-    let file_name = format!("wireshark-{WIRESHARK_VERSION}.tar.gz");
     let url =
         format!("https://2.na.dl.wireshark.org/src/wireshark-{WIRESHARK_VERSION}.tar.xz");
 
@@ -119,6 +117,11 @@ fn download_wireshark() -> Result<()> {
 }
 
 fn build_wireshark() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        env::set_var("WIRESHARK_BASE_DIR", "C:\\Development");
+        env::set_var("PLATFORM", "win64");
+    }
     cmake::Config::new(WIRESHARK_SOURCE_DIR)
         .define("BUILD_androiddump", "OFF")
         .define("BUILD_capinfos", "OFF")
