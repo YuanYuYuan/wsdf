@@ -2,12 +2,12 @@
 extern crate bindgen;
 
 use anyhow::Result;
-use flate2::read::GzDecoder;
+use xz2::read::XzDecoder;
 use std::env;
 use std::path::PathBuf;
 use tar::Archive;
 
-const WIRESHARK_VERSION: &str = "v4.1.1rc0";
+const WIRESHARK_VERSION: &str = "4.0.8";
 const WIRESHARK_SOURCE_DIR: &str = "wireshark";
 
 fn main() -> Result<()> {
@@ -56,29 +56,43 @@ fn generate_bindings() -> Result<()> {
         .header("wrapper.h")
         .generate_comments(false);
 
-    match pkg_config::probe_library("wireshark") {
-        Ok(libws) => {
-            for path in libws.include_paths {
-                builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
-            }
-        }
-        Err(_) => {
-            let glib = pkg_config::Config::new().probe("glib-2.0")?;
+    // match pkg_config::probe_library("wireshark") {
+    //     Ok(libws) => {
+    //         for path in libws.include_paths {
+    //             builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
+    //         }
+    //     }
+    //     Err(_) => {
+    //         let glib = pkg_config::Config::new().probe("glib-2.0")?;
+    //
+    //         for path in glib.include_paths {
+    //             builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
+    //         }
+    //
+    //         download_wireshark()?;
+    //         let dst = build_wireshark();
+    //
+    //         let mut ws_headers_path = dst;
+    //         ws_headers_path.push("include");
+    //         ws_headers_path.push("wireshark");
+    //
+    //         builder = builder.clang_arg(format!("-I{}", ws_headers_path.to_string_lossy()));
+    //     }
+    // }
+    let glib = pkg_config::Config::new().probe("glib-2.0")?;
 
-            for path in glib.include_paths {
-                builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
-            }
-
-            download_wireshark()?;
-            let dst = build_wireshark();
-
-            let mut ws_headers_path = dst;
-            ws_headers_path.push("include");
-            ws_headers_path.push("wireshark");
-
-            builder = builder.clang_arg(format!("-I{}", ws_headers_path.to_string_lossy()));
-        }
+    for path in glib.include_paths {
+        builder = builder.clang_arg(format!("-I{}", path.to_string_lossy()));
     }
+
+    download_wireshark()?;
+    let dst = build_wireshark();
+
+    let mut ws_headers_path = dst;
+    ws_headers_path.push("include");
+    ws_headers_path.push("wireshark");
+
+    builder = builder.clang_arg(format!("-I{}", ws_headers_path.to_string_lossy()));
 
     let bindings = builder.generate()?;
 
@@ -88,31 +102,15 @@ fn generate_bindings() -> Result<()> {
     Ok(())
 }
 
-fn download_and_build_wireshark() -> Result<()> {
-    // We'll have to pull wireshark in and build it...
-    println!("cargo:warning=libwireshark was not found, will be built from source");
-
-    download_wireshark()?;
-    let dst = build_wireshark();
-    println!("cargo:warning=dst dir is {}", &dst.display());
-
-    let mut dylib_dir = dst;
-    dylib_dir.push("lib");
-
-    println!(
-        "cargo:rustc-link-search=native={}",
-        dylib_dir.to_string_lossy()
-    );
-    Ok(())
-}
 
 fn download_wireshark() -> Result<()> {
     let file_name = format!("wireshark-{WIRESHARK_VERSION}.tar.gz");
     let url =
-        format!("https://gitlab.com/wireshark/wireshark/-/archive/{WIRESHARK_VERSION}/{file_name}");
+        format!("https://2.na.dl.wireshark.org/src/wireshark-{WIRESHARK_VERSION}.tar.xz");
+
     let response = reqwest::blocking::get(url)?;
     let bytes = response.bytes()?.to_vec();
-    let readable = GzDecoder::new(bytes.as_slice());
+    let readable = XzDecoder::new(bytes.as_slice());
     let mut archive = Archive::new(readable);
     archive.unpack(".")?;
     if std::path::Path::new(WIRESHARK_SOURCE_DIR).exists() {

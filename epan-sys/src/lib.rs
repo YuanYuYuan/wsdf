@@ -7,4 +7,7 @@
 #![allow(improper_ctypes)]
 #![allow(clippy::all)]
 
+#[cfg(not(target_os = "windows"))]
 include!(concat!(env!("CARGO_MANIFEST_DIR"), "/bindings.rs"));
+#[cfg(target_os = "windows")]
+include!(concat!(env!("CARGO_MANIFEST_DIR"), "/bindings_windows.rs"));
