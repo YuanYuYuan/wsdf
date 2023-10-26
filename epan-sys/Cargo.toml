@@ -1,6 +1,6 @@
 [package]
 name = "epan-sys"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "FFI Bindings to Wireshark's epan module"
@@ -18,7 +18,7 @@ doctest = false # because the comments in generated bindings aren't even Rust co
 [build-dependencies]
 pkg-config = "0.3"
 cmake = "0.1"
-bindgen = { version = "0.66", optional = true }
+bindgen = { version = "0.68.1", optional = true }
 reqwest = { version = "0.11.20", features = ["blocking"] }
 anyhow = "1.0.75"
 tar = "0.4.40"
