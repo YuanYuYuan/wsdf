@@ -7,7 +7,7 @@ use std::env;
 use std::path::PathBuf;
 use tar::Archive;
 
-const WIRESHARK_VERSION: &str = "4.0.8";
+const WIRESHARK_VERSION: &str = "4.0.10";
 const WIRESHARK_SOURCE_DIR: &str = "wireshark";
 
 fn main() -> Result<()> {
