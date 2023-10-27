@@ -31,16 +31,6 @@ fn link_wireshark() -> Result<()> {
         return Ok(());
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        // Download and build wireshark.lib
-        download_wireshark()?;
-        let dst = build_wireshark();
-        // Default wireshark libraray installed on windows
-        println!( "cargo:rustc-link-search=native={}", "C:\\Program Files\\Wireshark");
-        println!( "cargo:rustc-link-search=native={}", dst.to_string_lossy());
-    }
-
     // Default wireshark libraray installed on macos
     #[cfg(target_os = "macos")]
     println!( "cargo:rustc-link-search=native={}", "/Applications/Wireshark.app/Contents/Frameworks");
@@ -49,6 +39,20 @@ fn link_wireshark() -> Result<()> {
     println!("cargo:rerun-if-env-changed=WIRESHARK_LIB_DIR");
     if let Ok(libws_dir) = env::var("WIRESHARK_LIB_DIR") {
         println!("cargo:rustc-link-search=native={}", libws_dir);
+    } else {
+        // We need to build the wireshark from source for the linking
+        #[cfg(target_os = "windows")]
+        {
+            env::set_var("WIRESHARK_BASE_DIR", "C:\\Development");
+            env::set_var("PLATFORM", "win64");
+
+            // Download and build wireshark.lib
+            download_wireshark()?;
+            let dst = build_wireshark();
+            // Default wireshark libraray installed on windows
+            // println!( "cargo:rustc-link-search=native={}", "C:\\Program Files\\Wireshark");
+            println!( "cargo:rustc-link-search=native={}", dst.to_string_lossy());
+        }
     }
 
     println!("cargo:rustc-link-lib=dylib=wireshark");
